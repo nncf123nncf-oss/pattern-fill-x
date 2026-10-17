@@ -28,8 +28,13 @@ tr(!h('10月15日に開催').includes('数字'), 'S3 日付は数字でない');
 // S1 骨組みの読み取り
 const sk1 = '数字＋予告で始める → 空行 → 本文3行 → 空行 → 問いで締める → タグ2個';
 const p1 = X.parseSkeleton(sk1); tr(p1.ok, 'S1 例1が読める');
-eq(X.toControls(p1.slots), { open: '数字', body: 3, blank: true, close: '問いかけ', tag: 2 }, 'S1 例1が選択値に戻る');
-eq(X.skeletonText(p1.slots), '数字で始める → 空行 → 本文3行 → 空行 → 問いで締める → タグ2個', 'S1 骨組みの再表示');
+eq(p1.slots[0].type2, '予告', 'S1 2つ目の型を捨てない'); eq(X.toControls(p1.slots), null, 'S1 2型は選ぶ形で表せない(貼ったまま)');
+eq(X.approxControls(p1.slots), { open: '数字', body: 3, blank: true, close: '問いかけ', tag: 2 }, 'S1 近い選択値');
+eq(X.skeletonText(p1.slots), sk1, 'S1 骨組みの再表示(2型つき)');
+eq(st(p1.slots[0], '手順をまとめました'), 'ok', '判定 2型のうち2つ目に合えばok'); eq(st(p1.slots[0], '3つの話'), 'ok', '判定 2型のうち1つ目に合えばok'); eq(st(p1.slots[0], 'こんにちは'), 'unk', '判定 2型どちらでもない');
+eq(X.parseSkeleton('「数字で始める → 本文2行 → 問いで締める」。').ok, true, 'S1 前後の「」と。を許す');
+eq(X.toControls(X.parseSkeleton('数字で始める → 本文３行 → 問いで締める → タグ２個').slots), { open: '数字', body: 3, blank: false, close: '問いかけ', tag: 2 }, 'S1 全角数字を読む');
+eq(X.parseSkeleton('数字で始める → 本文30行 → 問いで締める').ok, true, 'S1 本文30行も読める'); eq(X.parseSkeleton('数字で始める → 本文0行 → 問いで締める').reason, '本文の行数は1行以上です', 'S1 本文0行の案内');
 eq(X.parseSkeleton('数字で始める → 空行 → 本文3行 → 空行 → 問いで締める → タグ2つ').ok, true, 'S1 タグ2つも読める');
 eq(X.parseSkeleton('共感で始める → 本文2行 → ひとことで締める → タグ1個').ok, true, 'S1 例2');
 // 全パターン: 選択値→欄→骨組みの1行→読み取り→選択値が元に戻る
@@ -47,7 +52,7 @@ const same = X.parseSkeleton('問いかけで始める（同じ行で問いで�
 tr(X.parseSkeleton('書き出しの型は決められない → 本文2行 → 締めの型は決められない').ok, 'S1 決められない系');
 tr(X.parseSkeleton('数字で始める → 本文2行 → リンク1件 → 問いで締める').ok, 'S1 リンク');
 tr(X.parseSkeleton('数字で始める → 本文2行 → 問いで締める → 先頭8000字まで').ok, 'S1 先頭8000字まで');
-['', '   ', 'こんにちは', '本文3行', '数字で始める → ほげ', '数字で始める → 問いで締める → 問いで締める', '数字で始める → 本文21行', '数字で始める → タグ11個', 'x'.repeat(401), '<script>alert(1)</script>'].forEach(t => eq(X.parseSkeleton(t).ok, false, 'S1 読めない形: ' + t.slice(0, 20)));
+['', '   ', 'こんにちは', '本文3行', '数字で始める → ほげ', '数字で始める → 問いで締める → 問いで締める', '数字で始める → 本文41行', '数字で始める → タグ21個', 'x'.repeat(401), '<script>alert(1)</script>'].forEach(t => eq(X.parseSkeleton(t).ok, false, 'S1 読めない形: ' + t.slice(0, 20)));
 eq(X.parseSkeleton(null).ok, false, 'S1 null'); eq(X.parseSkeleton(undefined).ok, false, 'S1 undefined');
 
 // S2 欄の生成
@@ -67,7 +72,7 @@ eq(st(CLOSE('問いかけ'), 'どこで止まっていますか？'), 'ok', '判
 eq(st(CLOSE('ひとこと'), 'どうですか？'), 'ng', '判定 ひとこと→問いはng'); eq(st(CLOSE('問いかけ'), 'あ'.repeat(25)), 'unk', '判定 締め決められない');
 eq(st(CLOSE('呼びかけ'), '試してみてください'), 'ok', '判定 呼びかけ'); eq(st(CLOSE('リンク誘導'), '詳細はこちら👇'), 'ok', '判定 リンク誘導');
 eq(st({ k: 'tag', n: 2, id: 'tag' }, '#a #b'), 'ok', '判定 タグok'); eq(st({ k: 'tag', n: 2, id: 'tag' }, 'a b'), 'ng', '判定 #なし');
-eq(st({ k: 'tag', n: 2, id: 'tag' }, '#a'), 'ng', '判定 個数違い'); eq(st({ k: 'tag', n: 1, id: 'tag' }, '#a #b'), 'ng', '判定 個数違い2'); eq(st({ k: 'tag', n: 2, id: 'tag' }, '＃a  #b'), 'ok', '判定 全角＃・連続空白');
+eq(st({ k: 'tag', n: 2, id: 'tag' }, '#a'), 'unk', '判定 個数違いは決められない'); eq(st({ k: 'tag', n: 1, id: 'tag' }, '#a #b'), 'unk', '判定 個数違い2'); eq(st({ k: 'tag', n: 2, id: 'tag' }, '＃a  #b'), 'ok', '判定 全角＃・連続空白');
 eq(st({ k: 'link', id: 'l0' }, 'https://x.example/a'), 'ok', '判定 リンクok'); eq(st({ k: 'link', id: 'l0' }, 'あいう'), 'ng', '判定 リンクなし');
 eq(st({ k: 'body', n: 1, id: 'b0' }, 'なにか'), 'free', '判定 本文は指定なし');
 eq(X.judge(OPEN('数字'), 'こんにちは').label, '決められない', '判定 ラベル文字'); eq(X.judge(OPEN('数字'), '3つ').label, '合っていそう', '判定 ラベル文字ok'); eq(X.judge(OPEN('数字'), '今日は休みました').label, '外れていそう', '判定 ラベル文字ng');
@@ -109,6 +114,10 @@ eq(X.buildDraft(sl, { open: '，．？' }, true), '，．？', 'S6 読点・句�
 ['localStorage', 'sessionStorage', 'indexedDB', 'download', 'navigator.share', 'fetch(', 'XMLHttpRequest', 'innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write', 'eval(', 'href="#"'].forEach(w => tr(!html.includes(w), 'S9 ' + w + ' を使っていない'));
 ['forms.gle', 'lin.ee', 'bit.ly'].forEach(w => tr(!html.includes(w), 'S9 短縮URLなし ' + w));
 tr(html.includes('mw-footer') && html.includes('みちAIワークス'), 'S9 素性表記フッタ'); tr(html.includes('navigator.clipboard.writeText'), 'S9 コピーはclipboardのみ');
+// ヒントは命令形でなく「判定の手がかり」の説明(言い回しの提案に見えない)
+['共感', '体験', '予告'].forEach(k => tr(!/入れます|終えます/.test(X.fieldHint({ k: 'open', type: k })), 'ヒントが命令形でない(書き出し ' + k + ')'));
+['呼びかけ', 'リンク誘導', 'ひとこと'].forEach(k => tr(!/入れます|終えます/.test(X.fieldHint({ k: 'close', type: k })), 'ヒントが命令形でない(締め ' + k + ')'));
+eq(X.fieldTitle(p1.slots[0]), '書き出し（数字＋予告）', '欄の見出し(2型)');
 // 禁止語(画面)
 ['バズ', '刺さ', '伸びる', '神', '正解', '診断', '分析', '完璧', '安心', '勝てる'].forEach(w => tr(!html.replace(/<script id="core">[\s\S]*?<\/script>/, '').includes(w) && !html.match(/<script id="core">([\s\S]*?)<\/script>/)[1].includes(w), '禁止語 ' + w + ' が無い'));
 tr(html.includes('型と反応の関係は分かっていません'), '常設表示 型と反応の関係は分かっていません');

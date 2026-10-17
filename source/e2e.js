@@ -36,14 +36,14 @@ const ok = (c, m) => { n++; if (!c) { f++; console.log('NG', m); } };
   ok(i.fields.join() === 'f_open' && !i.note, 'E4 選ぶ形で表せない骨組みは貼ったまま+説明 ' + i.fields.join() + i.note);
   await setSel('cTag', 1); await wait(); i = await info(); ok(i.note === true, 'E4 選択を変えると説明が消える');
   // ボタン
-  await b.ev(`document.getElementById('skSample1').click()`); await wait(); i = await info(); ok(i.fields.length === 6, 'E5 例1');
+  await b.ev(`document.getElementById('skSample1').click()`); await wait(); i = await info(); ok(i.fields.length === 6 && i.note === false && /数字＋予告/.test(i.skline), 'E5 例1は2型のまま・貼ったとおりの欄 ' + i.skline); ok(await b.ev(`document.getElementById('cOpen').value==='数字' && document.getElementById('cBody').value==='3' && document.getElementById('cTag').value==='2'`), 'E5 選択は近い値');
   await b.ev(`document.getElementById('skSample2').click()`); await wait(); i = await info(); ok(i.fields.length === 5, 'E5 例2');
   // 異常系(XSS)
   await setF('open', '<img src=x onerror="window.__x=1"><script>window.__x=2<\/script> 3つ'); await wait();
   ok(await b.ev(`window.__x===undefined && document.querySelectorAll('#fields img, #fields script, #result img').length===0`), 'E6 HTMLとして解釈されない');
   ok((await b.ev(`document.getElementById('draft').value`)).includes('<img src=x'), 'E6 そのまま文字として出る');
   // 改行は欄の中で空白になる
-  await setF('open', 'あ\nい'); await wait(); i = await info(); ok(i.vals[0] === 'あい' && i.draft.startsWith('あい'), 'E7 欄の中の改行は取り除く ' + JSON.stringify(i.vals[0]));
+  await setF('open', 'あ\nい'); await wait(); i = await info(); ok(i.vals[0] === 'あ\nい' && i.draft.startsWith('あ い'), 'E7 欄の中の改行は残り、下書きでは空白になる ' + JSON.stringify(i.vals[0]));
   // 句読点
   await setF('open', '一、二。三'); await wait(); await b.ev(`document.getElementById('punctBtn').click()`); await wait(); i = await info();
   ok(i.draft.startsWith('一二三') && await b.ev(`document.getElementById('punctBtn').getAttribute('aria-pressed')`) === 'true', 'E8 句読点を外す ' + i.draft);

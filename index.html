@@ -49,7 +49,7 @@
 
   .ctl { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
   .ctl .chk { display: flex; align-items: center; gap: 10px; min-height: 44px; }
-  .ctl .chk input { width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
+  .ctl .chk input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
   .skline { margin: 12px 0 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-weight: 700; overflow-wrap: anywhere; }
 
   .fld { margin: 0 0 14px; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
@@ -63,7 +63,7 @@
 
   .met { margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
   .met div { padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
-  .met dt { font-size: 16px; color: var(--ink3); margin: 0; }
+  .met dt { font-size: 14px; white-space: nowrap; color: var(--ink3); margin: 0; }
   .met dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   .status { min-height: 1.6em; color: var(--ink2); margin: 8px 0 0; }
 
@@ -121,11 +121,12 @@
           <label class="chk"><input type="checkbox" id="cBlank"><span>書き出しの後と締めの前に空行を入れる</span></label>
         </div>
         <p class="skline" id="skLine" aria-label="いまの骨組み"></p>
-        <p class="hint" id="skNote" hidden>貼った骨組みは選ぶ形では表せないため、貼ったとおりの欄を出しています。下の選択を変えると、選んだ形に切り替わります。</p>
+        <p class="hint" id="skNote" hidden>貼った骨組みは選ぶ形では表せないため、貼ったとおりの欄を出しています（上の選択は近い値です）。選択を変えると、選んだ形に切り替わります。</p>
       </div>
 
       <div class="panel">
         <h2>2. 欄に自分の言葉を入れる</h2>
+        <p class="hint" style="margin-top:0">1つの欄は1行になります。欄の中で改行しても、下書きでは空白になります。</p>
         <div id="fields"></div>
       </div>
     </section>
@@ -230,7 +231,7 @@ var PF = (function () {
   /* ---- 骨組み ---- */
   var OPENS = ['数字', '問いかけ', '共感', '体験', '予告', '指定なし'];
   var CLOSES = ['問いかけ', '呼びかけ', 'ひとこと', 'リンク誘導', '指定なし'];
-  var MAXBODY = 6, MAXTAG = 3, MAXBODY_PASTE = 20;
+  var MAXBODY = 6, MAXTAG = 3, MAXBODY_PASTE = 40;
   var CLOSE_PHRASE = { '問いかけ': '問いで締める', '呼びかけ': '呼びかけで締める', 'ひとこと': 'ひとことで締める', 'リンク誘導': 'リンク誘導で締める', '指定なし': '締めの型は決められない' };
   var PHRASE_CLOSE = {}; Object.keys(CLOSE_PHRASE).forEach(function (k) { PHRASE_CLOSE[CLOSE_PHRASE[k]] = k; });
 
@@ -243,7 +244,7 @@ var PF = (function () {
     if (c.tag > 0) s.push({ id: 'tag', k: 'tag', n: c.tag });
     return s;
   }
-  function shape(slots) { return JSON.stringify(slots.map(function (s) { return [s.k, s.type || '', s.n || 0, s.sameClose || '']; })); }
+  function shape(slots) { return JSON.stringify(slots.map(function (s) { return [s.k, s.type || '', s.n || 0, s.sameClose || '', s.type2 || '']; })); }
   // 貼った骨組みが「選ぶ形」で表せるなら選択値を返す。表せなければ null
   function toControls(slots) {
     var open = slots[0], body = 0, blank = false, close = null, tag = 0, i, s;
@@ -257,34 +258,51 @@ var PF = (function () {
     return shape(fromControls(c)) === shape(slots) ? c : null;
   }
 
+  // 選ぶ形で表せない骨組みでも、選択欄には近い値を入れる(古い値が残らないように)
+  function approxControls(slots) {
+    var c = { open: '指定なし', body: 0, blank: false, close: '指定なし', tag: 0 }, i, s;
+    for (i = 0; i < slots.length; i++) {
+      s = slots[i];
+      if (s.k === 'open') { c.open = s.type; if (s.sameClose) c.close = s.sameClose; }
+      else if (s.k === 'body') c.body = Math.min(MAXBODY, c.body + 1);
+      else if (s.k === 'blank') c.blank = true;
+      else if (s.k === 'close') c.close = s.type;
+      else if (s.k === 'tag') c.tag = Math.min(MAXTAG, c.tag + s.n);
+    }
+    return c;
+  }
+
   function parseSkeleton(str) {
-    var s = String(str == null ? '' : str).replace(/\s+/g, ' ').trim();
+    var s = String(str == null ? '' : str).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/\s+/g, ' ').trim();
+    s = s.replace(/^[「『"“]+/, '').replace(/[」』"”。．.\s]+$/, '');
     if (!s) return { ok: false, reason: '空です' };
     if (s.length > 400) return { ok: false, reason: '長すぎます' };
     var toks = s.split(/\s*(?:→|->)\s*/), slots = [], i, t, m, bi = 0, li = 0, ti = 0, sawOpen = false, sawClose = false, N = 0;
-    var OPEN_RE = /^(?:(数字|問いかけ|共感|体験|予告)(?:＋(?:数字|問いかけ|共感|体験|予告))?で始める|書き出しの型は決められない)(?:（同じ行で(問いで締める|呼びかけで締める|ひとことで締める|リンク誘導で締める|締めの型は決められない)）)?$/;
+    var OPEN_RE = /^(?:(数字|問いかけ|共感|体験|予告)(?:＋(数字|問いかけ|共感|体験|予告))?で始める|書き出しの型は決められない)(?:（同じ行で(問いで締める|呼びかけで締める|ひとことで締める|リンク誘導で締める|締めの型は決められない)）)?$/;
     for (i = 0; i < toks.length; i++) {
       t = toks[i];
       if (i === 0) {
         m = OPEN_RE.exec(t);
         if (!m) return { ok: false, reason: '先頭が書き出しの形ではありません' };
         var o = { id: 'open', k: 'open', type: m[1] || '指定なし' };
-        if (m[2]) { o.sameClose = PHRASE_CLOSE[m[2]]; sawClose = true; }
+        if (m[2]) o.type2 = m[2];
+        if (m[3]) { o.sameClose = PHRASE_CLOSE[m[3]]; sawClose = true; }
         slots.push(o); sawOpen = true; continue;
       }
       if (t === '1行だけ' || /^先頭\d+字まで$/.test(t)) continue;
       if (t === '空行') { slots.push({ id: 'blank' + (slots.length), k: 'blank' }); continue; }
       if ((m = /^本文(\d+)行$/.exec(t))) {
-        N = parseInt(m[1], 10); if (N < 1 || N > MAXBODY_PASTE) return { ok: false, reason: '本文の行数が' + MAXBODY_PASTE + '行を超えています' };
+        N = parseInt(m[1], 10); if (N < 1) return { ok: false, reason: '本文の行数は1行以上です' };
+        if (N > MAXBODY_PASTE) return { ok: false, reason: '本文の行数が' + MAXBODY_PASTE + '行を超えています' };
         while (N-- > 0) { slots.push({ id: 'b' + bi, k: 'body', n: bi + 1 }); bi++; }
         continue;
       }
       if ((m = /^タグ(\d+)[個つ]$/.exec(t))) {
-        N = parseInt(m[1], 10); if (N < 1 || N > 10) return { ok: false, reason: 'タグの個数は10個までです' };
+        N = parseInt(m[1], 10); if (N < 1 || N > 20) return { ok: false, reason: 'タグの個数は1〜20個です' };
         slots.push({ id: ti === 0 ? 'tag' : 'tag' + (ti + 1), k: 'tag', n: N }); ti++; continue;
       }
       if ((m = /^リンク(\d+)件$/.exec(t))) {
-        N = parseInt(m[1], 10); if (N < 1 || N > 5) return { ok: false, reason: 'リンクは5件までです' };
+        N = parseInt(m[1], 10); if (N < 1 || N > 10) return { ok: false, reason: 'リンクは1〜10件です' };
         while (N-- > 0) { slots.push({ id: 'l' + li, k: 'link' }); li++; }
         continue;
       }
@@ -294,7 +312,7 @@ var PF = (function () {
       }
       return { ok: false, reason: '読み取れない部分があります' };
     }
-    if (!sawOpen || slots.length > 40) return { ok: false, reason: '読み取れませんでした' };
+    if (!sawOpen || slots.length > 80) return { ok: false, reason: '読み取れませんでした' };
     return { ok: true, slots: slots };
   }
   var CLOSE_PHRASE_ALL = Object.keys(PHRASE_CLOSE);
@@ -307,7 +325,7 @@ var PF = (function () {
       if (s.k === 'body') { if (link) flush(); body++; continue; }
       if (s.k === 'link') { if (body) flush(); link++; continue; }
       flush();
-      if (s.k === 'open') out.push(s.type === '指定なし' ? '書き出しの型は決められない' : s.type + 'で始める');
+      if (s.k === 'open') out.push((s.type === '指定なし' ? '書き出しの型は決められない' : s.type + (s.type2 ? '＋' + s.type2 : '') + 'で始める') + (s.sameClose ? '（同じ行で' + CLOSE_PHRASE[s.sameClose] + '）' : ''));
       else if (s.k === 'blank') out.push('空行');
       else if (s.k === 'close') out.push(CLOSE_PHRASE[s.type]);
       else if (s.k === 'tag') out.push('タグ' + s.n + '個');
@@ -319,11 +337,11 @@ var PF = (function () {
   /* ---- 欄の判定 ---- */
   var LABEL = { ok: '合っていそう', unk: '決められない', ng: '外れていそう', free: '型の指定なし', empty: '未入力' };
   var RANK = { free: 0, ok: 1, unk: 2, ng: 3 };
-  function judgeOne(kind, type, t) {
+  function judgeOne(kind, type, t, type2) {
     if (type === '指定なし') return { state: 'free', msg: '' };
     if (kind === 'open') {
       var h = hooksOf(t);
-      if (h.indexOf(type) >= 0) return { state: 'ok', msg: '' };
+      if (h.indexOf(type) >= 0 || (type2 && h.indexOf(type2) >= 0)) return { state: 'ok', msg: '' };
       if (h.length) return { state: 'ng', msg: 'ほかの型（' + h.join('＋') + '）に当てはまります' };
       return { state: 'unk', msg: 'どの型とも決められません' };
     }
@@ -336,7 +354,7 @@ var PF = (function () {
     var t = String(text == null ? '' : text).replace(/[\r\n]+/g, ' ').trim(), r;
     if (t === '') return { state: 'empty', label: LABEL.empty, msg: '' };
     if (slot.k === 'open') {
-      r = judgeOne('open', slot.type, t);
+      r = judgeOne('open', slot.type, t, slot.type2);
       if (slot.sameClose) {
         var r2 = judgeOne('close', slot.sameClose, t);
         if (RANK[r2.state] > RANK[r.state]) r = { state: r2.state, msg: '（締めとして）' + r2.msg };
@@ -346,7 +364,7 @@ var PF = (function () {
     else if (slot.k === 'tag') {
       var parts = t.split(/\s+/), allHash = parts.every(function (p) { return /^[#＃][^\s#＃]+$/.test(p); });
       if (!allHash) r = { state: 'ng', msg: '「#」が付いていない語があります' };
-      else if (parts.length !== slot.n) r = { state: 'ng', msg: '骨組みは' + slot.n + '個、入れたのは' + parts.length + '個です' };
+      else if (parts.length !== slot.n) r = { state: 'unk', msg: '骨組みは' + slot.n + '個、入れたのは' + parts.length + '個です' };
       else r = { state: 'ok', msg: '' };
     } else if (slot.k === 'link') r = hasUrl(t) ? { state: 'ok', msg: '' } : { state: 'ng', msg: 'URLが見つかりません' };
     else r = { state: 'free', msg: '' };
@@ -376,37 +394,37 @@ var PF = (function () {
   }
   var HINT = {
     open: {
-      '数字': '数字と単位（つ・個・選・分・円・日・人・件・倍・％など）を入れます。日付と年は数字に数えません',
-      '問いかけ': '行の終わりを「？」か「〜か」にします',
-      '共感': '「正直」「実は」「本音」「しんどい」「悩んで」など気持ちを表す語を入れます',
-      '体験': '「した」「でした」「ました」などで終えるか、「昨日」「先月」などと「私」「自分」を入れます',
-      '予告': '「まとめ」「方法」「コツ」「理由」「ポイント」「手順」「〜選」「つのこと」のどれかを入れます',
+      '数字': '判定は、数字と単位（つ・個・選・分・円・日・人・件・倍・％など）の組み合わせを手がかりにしています。日付と年は数字に数えません',
+      '問いかけ': '判定は、行の終わりが「？」か「〜か」であることを手がかりにしています',
+      '共感': '判定は、「正直」「実は」「本音」「しんどい」「悩んで」など気持ちを表す語を手がかりにしています',
+      '体験': '判定は、「した」「でした」「ました」などの終わり方、または「昨日」「先月」などと「私」「自分」の組み合わせを手がかりにしています',
+      '予告': '判定は、「まとめ」「方法」「コツ」「理由」「ポイント」「手順」「〜選」「つのこと」を手がかりにしています',
       '指定なし': '型の指定はありません。好きな1行を入れます'
     },
     close: {
-      '問いかけ': '行の終わりを「？」か「〜か」にします',
-      '呼びかけ': '「してみて」「ください」「どうぞ」「しましょう」などを入れます',
-      'ひとこと': '20字以内で、問いではない一言にします',
-      'リンク誘導': 'URLを入れるか、「こちら」「↓」「👇」で終えます',
+      '問いかけ': '判定は、行の終わりが「？」か「〜か」であることを手がかりにしています',
+      '呼びかけ': '判定は、「してみて」「ください」「どうぞ」「しましょう」などを手がかりにしています',
+      'ひとこと': '判定は、20字以内で問いではない一言であることを手がかりにしています',
+      'リンク誘導': '判定は、URLがあること、または「こちら」「↓」「👇」で終わることを手がかりにしています',
       '指定なし': '型の指定はありません。好きな1行を入れます'
     }
   };
   function fieldTitle(s) {
-    if (s.k === 'open') return '書き出し（' + (s.type === '指定なし' ? '型の指定なし' : s.type) + '）';
+    if (s.k === 'open') return '書き出し（' + (s.type === '指定なし' ? '型の指定なし' : s.type + (s.type2 ? '＋' + s.type2 : '')) + (s.sameClose ? '・同じ行で締める' : '') + '）';
     if (s.k === 'body') return '本文 ' + s.n + '行目';
     if (s.k === 'close') return '締め（' + (s.type === '指定なし' ? '型の指定なし' : s.type) + '）';
     if (s.k === 'tag') return 'タグ（' + s.n + '個）';
     return 'リンク';
   }
   function fieldHint(s) {
-    if (s.k === 'open') return HINT.open[s.type];
+    if (s.k === 'open') return HINT.open[s.type] + (s.type2 ? '。または、' + HINT.open[s.type2] : '') + (s.sameClose ? '。この行は、締めの型の目安でも見ます' : '');
     if (s.k === 'close') return HINT.close[s.type];
     if (s.k === 'tag') return '「#」で始まる語を、半角スペースで区切って入れます';
     if (s.k === 'link') return 'URLを入れます';
     return '型の指定はありません。好きな1行を入れます';
   }
   return { OPENS: OPENS, CLOSES: CLOSES, MAXBODY: MAXBODY, MAXTAG: MAXTAG, units: units, chars: chars, hooksOf: hooksOf, closeTypeOf: closeTypeOf,
-    fromControls: fromControls, toControls: toControls, parseSkeleton: parseSkeleton, skeletonText: skeletonText,
+    fromControls: fromControls, toControls: toControls, approxControls: approxControls, parseSkeleton: parseSkeleton, skeletonText: skeletonText,
     judge: judge, buildDraft: buildDraft, metrics: metrics, fieldTitle: fieldTitle, fieldHint: fieldHint, LABEL: LABEL };
 })();
 </script>
@@ -435,7 +453,6 @@ var PF = (function () {
       var ta = el('textarea', 'fv'); ta.id = id; ta.rows = 2; ta.spellcheck = false; ta.setAttribute('autocomplete', 'off');
       ta.value = vals[s.id] || '';
       ta.addEventListener('input', function () {
-        if (/[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/[\r\n]+/g, '');
         vals[s.id] = ta.value; updateBadge(box, s); renderDraft();
       });
       box.appendChild(ta);
@@ -464,7 +481,7 @@ var PF = (function () {
     if (!$('skin').value.trim()) { $('skStatus').textContent = ''; return; }
     if (!r.ok) { $('skStatus').textContent = '読み取れませんでした（' + r.reason + '）。選んで決めてください。'; return; }
     var c = PF.toControls(r.slots);
-    if (c) { setControls(c); apply(PF.fromControls(c), false); } else apply(r.slots, true);
+    if (c) { setControls(c); apply(PF.fromControls(c), false); } else { setControls(PF.approxControls(r.slots)); apply(r.slots, true); }
     $('skStatus').textContent = '読み取れました。';
   }
   ['cOpen', 'cBody', 'cClose', 'cTag', 'cBlank'].forEach(function (id) { $(id).addEventListener('change', function () { $('skStatus').textContent = ''; fromSelects(); }); });
