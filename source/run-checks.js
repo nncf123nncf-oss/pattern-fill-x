@@ -119,6 +119,7 @@ tr(html.includes('mw-footer') && html.includes('みちAIワークス'), 'S9 素�
 // ヒントは命令形でなく「判定の手がかり」の説明(言い回しの提案に見えない)
 ['共感', '体験', '予告'].forEach(k => tr(!/入れます|終えます/.test(X.fieldHint({ k: 'open', type: k })), 'ヒントが命令形でない(書き出し ' + k + ')'));
 ['呼びかけ', 'リンク誘導', 'ひとこと'].forEach(k => tr(!/入れます|終えます/.test(X.fieldHint({ k: 'close', type: k })), 'ヒントが命令形でない(締め ' + k + ')'));
+['共感', '体験', '予告', '数字'].forEach(k => tr(!/「/.test(X.fieldHint({ k: 'open', type: k })), '書き出しのヒントに判定語の一覧が無い ' + k)); ['呼びかけ', 'リンク誘導', 'ひとこと'].forEach(k => tr(!/「/.test(X.fieldHint({ k: 'close', type: k })), '締めのヒントに判定語の一覧が無い ' + k));
 eq(X.fieldTitle(p1.slots[0]), '書き出し（数字＋予告）', '欄の見出し(2型)');
 // 禁止語(画面)
 ['バズ', '刺さ', '伸びる', '神', '正解', '診断', '分析', '完璧', '安心', '勝てる'].forEach(w => tr(!html.replace(/<script id="core">[\s\S]*?<\/script>/, '').includes(w) && !html.match(/<script id="core">([\s\S]*?)<\/script>/)[1].includes(w), '禁止語 ' + w + ' が無い'));
