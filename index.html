@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>型に流し込む</title>
+<meta name="description" content="投稿の骨組みを選ぶ（または貼る）と、書き出し・本文・締め・タグの欄が出ます。自分の言葉を入れると、空行つきの下書きがそろいます。入れた文は端末の中だけで処理し、保存しません。">
+<style>
+  :root {
+    --bg: #f6f4fa; --surface: #ffffff; --ink: #1f1a2b; --ink2: #3f3752; --ink3: #5a5070;
+    --line: #dcd6e8; --line-strong: #7a7090; --accent: #6F4BB0; --accent-ink: #ffffff; --accent-soft: #ebe4f6;
+    --ok-bg: #e1f2e5; --ok-ink: #1d5a2c; --unk-bg: #fff0c2; --unk-ink: #4d3200; --unk-line: #8a5a00; --ng-bg: #fbe3e6; --ng-ink: #8c1d2f; --free-bg: #efedf3;
+    --font: "Hiragino Sans","Yu Gothic","BIZ UDPGothic","Noto Sans JP",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17131f; --surface: #221c2e; --ink: #f1ecfa; --ink2: #d3c9e6; --ink3: #b0a4c8;
+      --line: #3d3450; --line-strong: #8a7da6; --accent: #BBA6EE; --accent-ink: #1c1233; --accent-soft: #3a2f55;
+      --ok-bg: #1d3a27; --ok-ink: #9be0ad; --unk-bg: #4a3a0c; --unk-ink: #ffe9b0; --unk-line: #e0b34a; --ng-bg: #4d1f27; --ng-ink: #ffb4bf; --free-bg: #2d2640;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.6; }
+  main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 32px; }
+  h1 { font-size: 22px; line-height: 1.3; margin: 8px 0 8px; }
+  h2 { font-size: 17px; line-height: 1.4; margin: 0 0 8px; }
+  p { margin: 0 0 8px; }
+  .lead { color: var(--ink2); }
+  .hint { font-size: 16px; color: var(--ink3); margin: 6px 0 0; }
+  .notes { list-style: none; margin: 12px 0 16px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; font-size: 16px; }
+  .notes li { margin: 0 0 6px; padding-left: 1.5em; text-indent: -1.5em; }
+  .notes li:last-child { margin-bottom: 0; }
+  .notes li::before { content: attr(data-n); display: inline-block; width: 1.5em; text-indent: 0; font-weight: 700; color: var(--accent); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin: 0 0 14px; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  label.lb { display: block; font-weight: 700; margin: 0 0 6px; }
+  textarea, select { display: block; width: 100%; font: inherit; font-size: 16px; line-height: 1.6; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink); }
+  select { min-height: 44px; }
+  textarea { resize: vertical; min-height: 44px; }
+  textarea.fv { min-height: 72px; }
+  textarea.ro { min-height: 200px; }
+  button { font: inherit; font-size: 16px; min-height: 44px; padding: 8px 14px; border-radius: 6px; cursor: pointer; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); }
+  button.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 700; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+  .ctl { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
+  .ctl .chk { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+  .ctl .chk input { width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
+  .skline { margin: 12px 0 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-weight: 700; overflow-wrap: anywhere; }
+
+  .fld { margin: 0 0 14px; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+  .fld:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+  .fld .hint { margin: 0 0 6px; }
+  .st { display: inline-block; margin-top: 6px; padding: 0 10px; border-radius: 999px; font-size: 16px; font-weight: 700; line-height: 1.6; border: 2px solid var(--line-strong); background: var(--free-bg); color: var(--ink); }
+  .st.ok { border-color: var(--ok-ink); background: var(--ok-bg); color: var(--ok-ink); }
+  .st.unk { border-color: var(--unk-line); background: var(--unk-bg); color: var(--unk-ink); }
+  .st.ng { border-color: var(--ng-ink); background: var(--ng-bg); color: var(--ng-ink); }
+  .stmsg { font-size: 16px; color: var(--ink2); margin: 4px 0 0; overflow-wrap: anywhere; }
+
+  .met { margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .met div { padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  .met dt { font-size: 16px; color: var(--ink3); margin: 0; }
+  .met dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .status { min-height: 1.6em; color: var(--ink2); margin: 8px 0 0; }
+
+  details { margin: 0 0 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px; }
+  summary { cursor: pointer; font-weight: 700; padding: 10px 0; min-height: 44px; }
+  details ul { margin: 0 0 12px; padding-left: 1.3em; }
+  details li { margin: 0 0 4px; }
+
+  .mw-footer { box-sizing: border-box; width: 100%; max-width: 100%; margin: 24px 0 0; padding: 16px; background: #F7F7F8;
+    border: 1px solid #D8D8DC; border-radius: 6px; color: #3A3A3E; font-family: system-ui, sans-serif; font-size: 12px; line-height: 1.7; }
+  .mw-footer p { margin: 0 0 6px; } .mw-footer p:last-child { margin-bottom: 0; } .mw-footer a { color: #0B5AA6; display: inline-block; padding: 13px 0; }
+
+  .layout { display: block; }
+  @media (min-width: 880px) {
+    main { padding: 24px 16px 40px; }
+    h1 { font-size: 24px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 16px; align-items: start; }
+    .a-out { position: sticky; top: 16px; }
+    .ctl { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>型に流し込む</h1>
+  <p class="lead">投稿の骨組みを選ぶ（または貼る）と、書き出し・本文・締め・タグの欄が出ます。自分の言葉を入れると、空行つきの下書きがそろいます。</p>
+  <ul class="notes" aria-label="先に読んでください">
+    <li data-n="1.">文を作るのはあなたです。この画面は欄を並べて、入れた文を順につなぐだけです。言い回しの提案や補完はしません</li>
+    <li data-n="2.">型に合っているかは言葉のパターンによる目安です。外れることがあります。型と反応の関係は分かっていません</li>
+    <li data-n="3.">個人情報（氏名・連絡先・住所など）は入れないでください</li>
+  </ul>
+
+  <div class="layout">
+    <section class="a-in" aria-label="骨組みと欄">
+      <div class="panel">
+        <h2>1. 骨組みを決める</h2>
+        <p class="hint" style="margin-top:0">入れた文はお使いの端末の中だけで処理します。送信せず、保存もしません。</p>
+        <label class="lb" for="skin" style="margin-top:12px">Day071「型ばらし」の骨組みの1行を貼る</label>
+        <textarea id="skin" rows="2" spellcheck="false" autocomplete="off" placeholder="骨組みの1行をここに貼ります（選ぶだけでも始められます）"></textarea>
+        <p class="status" id="skStatus" role="status"></p>
+        <div class="btnrow">
+          <button type="button" id="skSample1">骨組みの例1を入れる</button>
+          <button type="button" id="skSample2">骨組みの例2を入れる</button>
+        </div>
+        <p class="hint">または、下から選びます。</p>
+        <div class="ctl">
+          <div><label class="lb" for="cOpen">書き出しの型</label>
+            <select id="cOpen"><option>数字</option><option>問いかけ</option><option>共感</option><option>体験</option><option>予告</option><option>指定なし</option></select></div>
+          <div><label class="lb" for="cBody">本文の行数</label>
+            <select id="cBody"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+          <div><label class="lb" for="cClose">締めの型</label>
+            <select id="cClose"><option>問いかけ</option><option>呼びかけ</option><option>ひとこと</option><option>リンク誘導</option><option>指定なし</option></select></div>
+          <div><label class="lb" for="cTag">タグの個数</label>
+            <select id="cTag"><option>0</option><option>1</option><option>2</option><option>3</option></select></div>
+          <label class="chk"><input type="checkbox" id="cBlank"><span>書き出しの後と締めの前に空行を入れる</span></label>
+        </div>
+        <p class="skline" id="skLine" aria-label="いまの骨組み"></p>
+        <p class="hint" id="skNote" hidden>貼った骨組みは選ぶ形では表せないため、貼ったとおりの欄を出しています。下の選択を変えると、選んだ形に切り替わります。</p>
+      </div>
+
+      <div class="panel">
+        <h2>2. 欄に自分の言葉を入れる</h2>
+        <div id="fields"></div>
+      </div>
+    </section>
+
+    <section class="a-out" aria-label="下書き">
+      <div class="panel">
+        <h2>3. 下書き</h2>
+        <p class="lead" id="emptyMsg">欄に文を入れると、ここに下書きが並びます。</p>
+        <div id="result" hidden>
+          <textarea id="draft" class="ro" readonly aria-label="下書き"></textarea>
+          <dl class="met" id="met"></dl>
+          <p class="hint">ユニット数は目安です。数え方がXと完全に同じとは限りません。</p>
+        </div>
+        <div class="btnrow">
+          <button type="button" class="pri" id="copyBtn">下書きをコピー</button>
+          <button type="button" id="punctBtn" aria-pressed="false">句読点を外す</button>
+        </div>
+        <p class="status" id="copyStatus" role="status"></p>
+      </div>
+    </section>
+  </div>
+
+  <details>
+    <summary>見ているもの・見ないもの</summary>
+    <p style="margin-top:8px"><b>見ているもの</b></p>
+    <ul>
+      <li>書き出しの欄が選んだ型に当てはまるか（数字・問いかけ・共感・体験・予告）</li>
+      <li>締めの欄が選んだ型に当てはまるか（問いかけ・呼びかけ・ひとこと・リンク誘導）</li>
+      <li>タグの欄が「#」で始まる語で、個数が骨組みと合うか</li>
+      <li>下書きの文字数・ユニット数・行数</li>
+    </ul>
+    <p><b>見ないもの</b></p>
+    <ul>
+      <li>投稿が良いか悪いか、反応の数、文章の意味や事実</li>
+      <li>言い回しの提案、文の補完、書き換え</li>
+      <li>入れた文の保存（ページを閉じると消えます）</li>
+    </ul>
+  </details>
+
+  <footer class="mw-footer">
+    <p>みちAIワークス（MICHI AI WORKS）／代表 田中　泉</p>
+    <p>運営: <a href="https://michi-portfolio.vercel.app/" rel="noopener">みちAIワークス 公式サイト</a>（https://michi-portfolio.vercel.app/ ）／ お問い合わせ: <a href="mailto:nncf123nncf@gmail.com">nncf123nncf@gmail.com</a></p>
+    <p>入れた文はこのページの中（お使いの端末のブラウザ）だけで処理し、サーバーには送信せず、保存もしません。ページを閉じると消えます。アクセス解析（Cloudflare Web Analytics）で、ページの閲覧状況（閲覧数・参照元・ブラウザの種類など）を計測しています。入れた文は送信しません。</p>
+    <p>型の見分けは言葉のパターンによる目安です。投稿の良し悪しや、反応との関係は分かりません。</p>
+    <p>ログイン・会員登録・パスワードの入力を求めることはありません。</p>
+  </footer>
+</main>
+
+<script id="core">
+/* 骨組みの読み取り・欄の判定・下書きの組み立て(画面を使わない)。source/run-checks.js がここだけを取り出して検算する */
+var PF = (function () {
+  'use strict';
+  var WIDE = 'a1,a1,a4,a4,a7,a8,aa,aa,ad,ae,b0,b4,b6,ba,bc,bf,c6,c6,d0,d0,d7,d8,de,e1,e6,e6,e8,ea,ec,ed,f0,f0,f2,f3,f7,fa,fc,fc,fe,fe,101,101,111,111,113,113,11b,11b,126,127,12b,12b,131,133,138,138,13f,142,144,144,148,14b,14d,14d,152,153,166,167,16b,16b,1ce,1ce,1d0,1d0,1d2,1d2,1d4,1d4,1d6,1d6,1d8,1d8,1da,1da,1dc,1dc,251,251,261,261,2c4,2c4,2c7,2c7,2c9,2cb,2cd,2cd,2d0,2d0,2d8,2db,2dd,2dd,2df,2df,300,36f,391,3a1,3a3,3a9,3b1,3c1,3c3,3c9,401,401,410,44f,451,451,1100,115f,2010,2010,2013,2016,2018,2019,201c,201d,2020,2022,2024,2027,2030,2030,2032,2033,2035,2035,203b,203b,203e,203e,2074,2074,207f,207f,2081,2084,20ac,20ac,2103,2103,2105,2105,2109,2109,2113,2113,2116,2116,2121,2122,2126,2126,212b,212b,2153,2154,215b,215e,2160,216b,2170,2179,2189,2189,2190,2199,21b8,21b9,21d2,21d2,21d4,21d4,21e7,21e7,2200,2200,2202,2203,2207,2208,220b,220b,220f,220f,2211,2211,2215,2215,221a,221a,221d,2220,2223,2223,2225,2225,2227,222c,222e,222e,2234,2237,223c,223d,2248,2248,224c,224c,2252,2252,2260,2261,2264,2267,226a,226b,226e,226f,2282,2283,2286,2287,2295,2295,2299,2299,22a5,22a5,22bf,22bf,2312,2312,231a,231b,2329,232a,23e9,23ec,23f0,23f0,23f3,23f3,2460,24e9,24eb,254b,2550,2573,2580,258f,2592,2595,25a0,25a1,25a3,25a9,25b2,25b3,25b6,25b7,25bc,25bd,25c0,25c1,25c6,25c8,25cb,25cb,25ce,25d1,25e2,25e5,25ef,25ef,25fd,25fe,2605,2606,2609,2609,260e,260f,2614,2615,261c,261c,261e,261e,2640,2640,2642,2642,2648,2653,2660,2661,2663,2665,2667,266a,266c,266d,266f,266f,267f,267f,2693,2693,269e,269f,26a1,26a1,26aa,26ab,26bd,26bf,26c4,26e1,26e3,26e3,26e8,26ff,2705,2705,270a,270b,2728,2728,273d,273d,274c,274c,274e,274e,2753,2755,2757,2757,2776,277f,2795,2797,27b0,27b0,27bf,27bf,2b1b,2b1c,2b50,2b50,2b55,2b59,2e80,2e99,2e9b,2ef3,2f00,2fd5,2ff0,303e,3041,3096,3099,30ff,3105,312f,3131,318e,3190,31e3,31ef,321e,3220,4dbf,4e00,a48c,a490,a4c6,a960,a97c,ac00,d7a3,e000,faff,fe00,fe19,fe30,fe52,fe54,fe66,fe68,fe6b,ff01,ff60,ffe0,ffe6,fffd,fffd,16fe0,16fe4,16ff0,16ff1,17000,187f7,18800,18cd5,18d00,18d08,1aff0,1aff3,1aff5,1affb,1affd,1affe,1b000,1b122,1b132,1b132,1b150,1b152,1b155,1b155,1b164,1b167,1b170,1b2fb,1f004,1f004,1f0cf,1f0cf,1f100,1f10a,1f110,1f12d,1f130,1f169,1f170,1f1ac,1f200,1f202,1f210,1f23b,1f240,1f248,1f250,1f251,1f260,1f265,1f300,1f320,1f32d,1f335,1f337,1f37c,1f37e,1f393,1f3a0,1f3ca,1f3cf,1f3d3,1f3e0,1f3f0,1f3f4,1f3f4,1f3f8,1f43e,1f440,1f440,1f442,1f4fc,1f4ff,1f53d,1f54b,1f54e,1f550,1f567,1f57a,1f57a,1f595,1f596,1f5a4,1f5a4,1f5fb,1f64f,1f680,1f6c5,1f6cc,1f6cc,1f6d0,1f6d2,1f6d5,1f6d7,1f6dc,1f6df,1f6eb,1f6ec,1f6f4,1f6fc,1f7e0,1f7eb,1f7f0,1f7f0,1f90c,1f93a,1f93c,1f945,1f947,1f9ff,1fa70,1fa7c,1fa80,1fa88,1fa90,1fabd,1fabf,1fac5,1face,1fadb,1fae0,1fae8,1faf0,1faf8,20000,2fffd,30000,3fffd,e0100,e01ef,f0000,ffffd,100000,10fffd'.split(',').map(function (h) { return parseInt(h, 16); });
+  function cpUnits(cp) {
+    var lo = 0, hi = WIDE.length / 2 - 1;
+    while (lo <= hi) { var mid = (lo + hi) >> 1, a = WIDE[mid * 2], b = WIDE[mid * 2 + 1]; if (cp < a) hi = mid - 1; else if (cp > b) lo = mid + 1; else return 2; }
+    return 1;
+  }
+  function units(s) { var n = 0, i, cp; for (i = 0; i < s.length; i++) { cp = s.codePointAt(i); if (cp > 0xFFFF) i++; n += cpUnits(cp); } return n; }
+  function chars(s) { return Array.from(s).length; }
+
+  /* ---- 型の見分け(Day071 型ばらし と同じ規則) ---- */
+  var D = '[0-9０-９]';
+  var NUMRUN = D + '+(?:[,，.．]' + D + '+)*';
+  var UNIT = '(?:つのこと|つ|個|選|分|円|日|人|件|倍|%|％|kg|ヶ月|か月|ヵ月|ケ月|カ月|ヶ所|か所|回|本|枚|冊|社|歳|年|時間|秒|万|割|位|番|歩|km|キロ|ステップ|ポイント)';
+  var NUMUNIT_RE = new RegExp(NUMRUN + UNIT, 'i');
+  var URL_RE = /https?:\/\/\S+/ig;
+  var TAIL_RE = /[\s　「」『』（）()【】️‍\p{Extended_Pictographic}]+$/u;
+  function fill(m) { return new Array(m.length + 1).join('□'); }
+  function mask(t) {
+    return t.replace(URL_RE, fill)
+      .replace(new RegExp(D + '{4}[年/.\\-]' + D + '{1,2}[月/.\\-]' + D + '{1,2}日?', 'g'), fill)
+      .replace(new RegExp('毎月' + D + '{1,2}日', 'g'), fill)
+      .replace(new RegExp(D + '{1,2}月' + D + '{1,2}日', 'g'), fill)
+      .replace(new RegExp(D + '{1,2}月', 'g'), fill)
+      .replace(new RegExp(D + '{4}年(?!前|間)', 'g'), fill)
+      .replace(new RegExp(D + '{1,2}/' + D + '{1,2}', 'g'), fill);
+  }
+  function tailStrip(t) { var p; do { p = t; t = t.replace(TAIL_RE, '').replace(/[。．.！!…‥笑~～〜]+$/, ''); } while (t !== p); return t; }
+  function core(t) { return t.replace(URL_RE, ' ').replace(/(?:\s*[#＃][^\s#＃]+)+\s*$/, '').trim(); }
+  function hasUrl(t) { URL_RE.lastIndex = 0; var r = URL_RE.test(t); URL_RE.lastIndex = 0; return r; }
+  function isQ(t) { var s = tailStrip(core(t)); return /[？?]$/.test(s) || /(ます|です|ない|う|る|た|ん)か$/.test(s); }
+  function hooksOf(line) {
+    var m = mask(line), out = [], s = tailStrip(core(line));
+    if (NUMUNIT_RE.test(m)) out.push('数字');
+    if (isQ(line)) out.push('問いかけ');
+    if (/正直|(?:^|[^一-龥])実は|ぶっちゃけ|本音|あるある|しんどい|つらい|辛い|困って|悩んで|ですよね/.test(line)) out.push('共感');
+    if ((/(した|でした|だった|ました)$/.test(s) && !/ございました|お疲れ様でした/.test(s)) || (/(昨日|先月|今日|去年|先週|今朝)/.test(line) && /(私|僕|ぼく|わたし|自分|うち(?:の|は|で|が|も)|俺)/.test(line))) out.push('体験');
+    if (/[0-9０-９一二三四五六七八九十]+選|まとめ|方法|コツ|理由|ポイント|手順|つのこと/.test(line.replace(/コツコツ|ポイント(?:還元|カード|アップ|ゲット)/g, ''))) out.push('予告');
+    return out;
+  }
+  function closeTypeOf(t) {
+    var c = core(t);
+    if (hasUrl(t)) return 'リンク誘導';
+    if (isQ(t)) return '問いかけ';
+    if (/(こちら.{0,3}|[↓⬇▼]|👇)$/.test(c.replace(/[︎️\s　。．.！!…]+$/g, ''))) return 'リンク誘導';
+    if (/(してみて|みてください|てください|ください|どうぞ|しましょう|ましょう|てみよう)/.test(c)) return '呼びかけ';
+    if (chars(c) <= 20) return 'ひとこと';
+    return '決められない';
+  }
+
+  /* ---- 骨組み ---- */
+  var OPENS = ['数字', '問いかけ', '共感', '体験', '予告', '指定なし'];
+  var CLOSES = ['問いかけ', '呼びかけ', 'ひとこと', 'リンク誘導', '指定なし'];
+  var MAXBODY = 6, MAXTAG = 3, MAXBODY_PASTE = 20;
+  var CLOSE_PHRASE = { '問いかけ': '問いで締める', '呼びかけ': '呼びかけで締める', 'ひとこと': 'ひとことで締める', 'リンク誘導': 'リンク誘導で締める', '指定なし': '締めの型は決められない' };
+  var PHRASE_CLOSE = {}; Object.keys(CLOSE_PHRASE).forEach(function (k) { PHRASE_CLOSE[CLOSE_PHRASE[k]] = k; });
+
+  function fromControls(c) {
+    var s = [{ id: 'open', k: 'open', type: c.open }], i;
+    if (c.blank) s.push({ id: 'blank1', k: 'blank' });
+    for (i = 0; i < c.body; i++) s.push({ id: 'b' + i, k: 'body', n: i + 1 });
+    if (c.blank && c.body > 0) s.push({ id: 'blank2', k: 'blank' });
+    s.push({ id: 'close', k: 'close', type: c.close });
+    if (c.tag > 0) s.push({ id: 'tag', k: 'tag', n: c.tag });
+    return s;
+  }
+  function shape(slots) { return JSON.stringify(slots.map(function (s) { return [s.k, s.type || '', s.n || 0, s.sameClose || '']; })); }
+  // 貼った骨組みが「選ぶ形」で表せるなら選択値を返す。表せなければ null
+  function toControls(slots) {
+    var open = slots[0], body = 0, blank = false, close = null, tag = 0, i, s;
+    if (!open || open.k !== 'open') return null;
+    for (i = 0; i < slots.length; i++) {
+      s = slots[i];
+      if (s.k === 'body') body++; else if (s.k === 'blank') blank = true; else if (s.k === 'close') close = s.type; else if (s.k === 'tag') tag += s.n;
+    }
+    if (!close || body > MAXBODY || tag > MAXTAG) return null;
+    var c = { open: open.type, body: body, blank: blank, close: close, tag: tag };
+    return shape(fromControls(c)) === shape(slots) ? c : null;
+  }
+
+  function parseSkeleton(str) {
+    var s = String(str == null ? '' : str).replace(/\s+/g, ' ').trim();
+    if (!s) return { ok: false, reason: '空です' };
+    if (s.length > 400) return { ok: false, reason: '長すぎます' };
+    var toks = s.split(/\s*(?:→|->)\s*/), slots = [], i, t, m, bi = 0, li = 0, ti = 0, sawOpen = false, sawClose = false, N = 0;
+    var OPEN_RE = /^(?:(数字|問いかけ|共感|体験|予告)(?:＋(?:数字|問いかけ|共感|体験|予告))?で始める|書き出しの型は決められない)(?:（同じ行で(問いで締める|呼びかけで締める|ひとことで締める|リンク誘導で締める|締めの型は決められない)）)?$/;
+    for (i = 0; i < toks.length; i++) {
+      t = toks[i];
+      if (i === 0) {
+        m = OPEN_RE.exec(t);
+        if (!m) return { ok: false, reason: '先頭が書き出しの形ではありません' };
+        var o = { id: 'open', k: 'open', type: m[1] || '指定なし' };
+        if (m[2]) { o.sameClose = PHRASE_CLOSE[m[2]]; sawClose = true; }
+        slots.push(o); sawOpen = true; continue;
+      }
+      if (t === '1行だけ' || /^先頭\d+字まで$/.test(t)) continue;
+      if (t === '空行') { slots.push({ id: 'blank' + (slots.length), k: 'blank' }); continue; }
+      if ((m = /^本文(\d+)行$/.exec(t))) {
+        N = parseInt(m[1], 10); if (N < 1 || N > MAXBODY_PASTE) return { ok: false, reason: '本文の行数が' + MAXBODY_PASTE + '行を超えています' };
+        while (N-- > 0) { slots.push({ id: 'b' + bi, k: 'body', n: bi + 1 }); bi++; }
+        continue;
+      }
+      if ((m = /^タグ(\d+)[個つ]$/.exec(t))) {
+        N = parseInt(m[1], 10); if (N < 1 || N > 10) return { ok: false, reason: 'タグの個数は10個までです' };
+        slots.push({ id: ti === 0 ? 'tag' : 'tag' + (ti + 1), k: 'tag', n: N }); ti++; continue;
+      }
+      if ((m = /^リンク(\d+)件$/.exec(t))) {
+        N = parseInt(m[1], 10); if (N < 1 || N > 5) return { ok: false, reason: 'リンクは5件までです' };
+        while (N-- > 0) { slots.push({ id: 'l' + li, k: 'link' }); li++; }
+        continue;
+      }
+      if (CLOSE_PHRASE_ALL.indexOf(t) >= 0) {
+        if (sawClose) return { ok: false, reason: '締めが2つあります' };
+        slots.push({ id: 'close', k: 'close', type: PHRASE_CLOSE[t] }); sawClose = true; continue;
+      }
+      return { ok: false, reason: '読み取れない部分があります' };
+    }
+    if (!sawOpen || slots.length > 40) return { ok: false, reason: '読み取れませんでした' };
+    return { ok: true, slots: slots };
+  }
+  var CLOSE_PHRASE_ALL = Object.keys(PHRASE_CLOSE);
+
+  function skeletonText(slots) {
+    var out = [], body = 0, link = 0, i, s;
+    function flush() { if (body) { out.push('本文' + body + '行'); body = 0; } if (link) { out.push('リンク' + link + '件'); link = 0; } }
+    for (i = 0; i < slots.length; i++) {
+      s = slots[i];
+      if (s.k === 'body') { if (link) flush(); body++; continue; }
+      if (s.k === 'link') { if (body) flush(); link++; continue; }
+      flush();
+      if (s.k === 'open') out.push(s.type === '指定なし' ? '書き出しの型は決められない' : s.type + 'で始める');
+      else if (s.k === 'blank') out.push('空行');
+      else if (s.k === 'close') out.push(CLOSE_PHRASE[s.type]);
+      else if (s.k === 'tag') out.push('タグ' + s.n + '個');
+    }
+    flush();
+    return out.join(' → ');
+  }
+
+  /* ---- 欄の判定 ---- */
+  var LABEL = { ok: '合っていそう', unk: '決められない', ng: '外れていそう', free: '型の指定なし', empty: '未入力' };
+  var RANK = { free: 0, ok: 1, unk: 2, ng: 3 };
+  function judgeOne(kind, type, t) {
+    if (type === '指定なし') return { state: 'free', msg: '' };
+    if (kind === 'open') {
+      var h = hooksOf(t);
+      if (h.indexOf(type) >= 0) return { state: 'ok', msg: '' };
+      if (h.length) return { state: 'ng', msg: 'ほかの型（' + h.join('＋') + '）に当てはまります' };
+      return { state: 'unk', msg: 'どの型とも決められません' };
+    }
+    var c = closeTypeOf(t);
+    if (c === type) return { state: 'ok', msg: '' };
+    if (c === '決められない') return { state: 'unk', msg: 'どの型とも決められません' };
+    return { state: 'ng', msg: 'ほかの型（' + c + '）に当てはまります' };
+  }
+  function judge(slot, text) {
+    var t = String(text == null ? '' : text).replace(/[\r\n]+/g, ' ').trim(), r;
+    if (t === '') return { state: 'empty', label: LABEL.empty, msg: '' };
+    if (slot.k === 'open') {
+      r = judgeOne('open', slot.type, t);
+      if (slot.sameClose) {
+        var r2 = judgeOne('close', slot.sameClose, t);
+        if (RANK[r2.state] > RANK[r.state]) r = { state: r2.state, msg: '（締めとして）' + r2.msg };
+        else if (r2.msg && RANK[r2.state] === RANK[r.state] && r.state !== 'free') r.msg = r.msg || '（締めとして）' + r2.msg;
+      }
+    } else if (slot.k === 'close') r = judgeOne('close', slot.type, t);
+    else if (slot.k === 'tag') {
+      var parts = t.split(/\s+/), allHash = parts.every(function (p) { return /^[#＃][^\s#＃]+$/.test(p); });
+      if (!allHash) r = { state: 'ng', msg: '「#」が付いていない語があります' };
+      else if (parts.length !== slot.n) r = { state: 'ng', msg: '骨組みは' + slot.n + '個、入れたのは' + parts.length + '個です' };
+      else r = { state: 'ok', msg: '' };
+    } else if (slot.k === 'link') r = hasUrl(t) ? { state: 'ok', msg: '' } : { state: 'ng', msg: 'URLが見つかりません' };
+    else r = { state: 'free', msg: '' };
+    return { state: r.state, label: LABEL[r.state], msg: r.msg };
+  }
+
+  /* ---- 下書き ---- */
+  function buildDraft(slots, vals, noPunct) {
+    var rows = [], i, s, v, out = [];
+    for (i = 0; i < slots.length; i++) {
+      s = slots[i];
+      if (s.k === 'blank') { rows.push(null); continue; }
+      v = String(vals[s.id] == null ? '' : vals[s.id]).replace(/[\r\n]+/g, ' ').trim();
+      if (s.k === 'tag') v = v.replace(/\s+/g, ' ');
+      if (v === '') continue;
+      rows.push(v);
+    }
+    for (i = 0; i < rows.length; i++) { if (rows[i] === null && (out.length === 0 || out[out.length - 1] === null)) continue; out.push(rows[i]); }
+    while (out.length && out[out.length - 1] === null) out.pop();
+    var text = out.map(function (r) { return r === null ? '' : r; }).join('\n');
+    if (noPunct) text = text.replace(/[。、]/g, '');
+    return text;
+  }
+  function metrics(text) {
+    var lines = text === '' ? 0 : text.split('\n').filter(function (l) { return l.trim() !== ''; }).length;
+    return { chars: chars(text), units: units(text), lines: lines };
+  }
+  var HINT = {
+    open: {
+      '数字': '数字と単位（つ・個・選・分・円・日・人・件・倍・％など）を入れます。日付と年は数字に数えません',
+      '問いかけ': '行の終わりを「？」か「〜か」にします',
+      '共感': '「正直」「実は」「本音」「しんどい」「悩んで」など気持ちを表す語を入れます',
+      '体験': '「した」「でした」「ました」などで終えるか、「昨日」「先月」などと「私」「自分」を入れます',
+      '予告': '「まとめ」「方法」「コツ」「理由」「ポイント」「手順」「〜選」「つのこと」のどれかを入れます',
+      '指定なし': '型の指定はありません。好きな1行を入れます'
+    },
+    close: {
+      '問いかけ': '行の終わりを「？」か「〜か」にします',
+      '呼びかけ': '「してみて」「ください」「どうぞ」「しましょう」などを入れます',
+      'ひとこと': '20字以内で、問いではない一言にします',
+      'リンク誘導': 'URLを入れるか、「こちら」「↓」「👇」で終えます',
+      '指定なし': '型の指定はありません。好きな1行を入れます'
+    }
+  };
+  function fieldTitle(s) {
+    if (s.k === 'open') return '書き出し（' + (s.type === '指定なし' ? '型の指定なし' : s.type) + '）';
+    if (s.k === 'body') return '本文 ' + s.n + '行目';
+    if (s.k === 'close') return '締め（' + (s.type === '指定なし' ? '型の指定なし' : s.type) + '）';
+    if (s.k === 'tag') return 'タグ（' + s.n + '個）';
+    return 'リンク';
+  }
+  function fieldHint(s) {
+    if (s.k === 'open') return HINT.open[s.type];
+    if (s.k === 'close') return HINT.close[s.type];
+    if (s.k === 'tag') return '「#」で始まる語を、半角スペースで区切って入れます';
+    if (s.k === 'link') return 'URLを入れます';
+    return '型の指定はありません。好きな1行を入れます';
+  }
+  return { OPENS: OPENS, CLOSES: CLOSES, MAXBODY: MAXBODY, MAXTAG: MAXTAG, units: units, chars: chars, hooksOf: hooksOf, closeTypeOf: closeTypeOf,
+    fromControls: fromControls, toControls: toControls, parseSkeleton: parseSkeleton, skeletonText: skeletonText,
+    judge: judge, buildDraft: buildDraft, metrics: metrics, fieldTitle: fieldTitle, fieldHint: fieldHint, LABEL: LABEL };
+})();
+</script>
+
+<script id="ui">
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var vals = {}, slots = null, custom = false, noPunct = false, timer = null;
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function readControls() { return { open: $('cOpen').value, body: parseInt($('cBody').value, 10), blank: $('cBlank').checked, close: $('cClose').value, tag: parseInt($('cTag').value, 10) }; }
+  function setControls(c) { $('cOpen').value = c.open; $('cBody').value = String(c.body); $('cBlank').checked = c.blank; $('cClose').value = c.close; $('cTag').value = String(c.tag); }
+
+  function updateBadge(box, slot) {
+    var j = PF.judge(slot, vals[slot.id] || ''), st = box.querySelector('.st'), msg = box.querySelector('.stmsg');
+    st.className = 'st' + (j.state === 'ok' || j.state === 'unk' || j.state === 'ng' ? ' ' + j.state : '');
+    st.textContent = j.label; msg.textContent = j.msg; msg.hidden = !j.msg;
+  }
+  function renderFields() {
+    var host = $('fields'); host.textContent = '';
+    slots.forEach(function (s) {
+      if (s.k === 'blank') return;
+      var box = el('div', 'fld'), id = 'f_' + s.id;
+      var lb = el('label', 'lb', PF.fieldTitle(s)); lb.setAttribute('for', id); box.appendChild(lb);
+      box.appendChild(el('p', 'hint', PF.fieldHint(s)));
+      var ta = el('textarea', 'fv'); ta.id = id; ta.rows = 2; ta.spellcheck = false; ta.setAttribute('autocomplete', 'off');
+      ta.value = vals[s.id] || '';
+      ta.addEventListener('input', function () {
+        if (/[\r\n]/.test(ta.value)) ta.value = ta.value.replace(/[\r\n]+/g, '');
+        vals[s.id] = ta.value; updateBadge(box, s); renderDraft();
+      });
+      box.appendChild(ta);
+      var st = el('span', 'st', ''); box.appendChild(st); box.appendChild(el('p', 'stmsg', ''));
+      host.appendChild(box); updateBadge(box, s);
+    });
+  }
+  function renderDraft() {
+    var text = PF.buildDraft(slots, vals, noPunct);
+    $('copyStatus').textContent = '';
+    if (text === '') { $('result').hidden = true; $('emptyMsg').hidden = false; $('draft').value = ''; $('met').textContent = ''; return; }
+    $('emptyMsg').hidden = true; $('result').hidden = false; var dr = $('draft'); dr.value = text; dr.style.height = 'auto'; dr.style.height = Math.max(200, dr.scrollHeight + 4) + 'px';
+    var m = PF.metrics(text), mt = $('met'); mt.textContent = '';
+    [['文字数', m.chars], ['ユニット数', m.units], ['行数', m.lines]].forEach(function (p) {
+      var d = el('div'); d.appendChild(el('dt', null, p[0])); d.appendChild(el('dd', null, String(p[1]))); mt.appendChild(d);
+    });
+  }
+  function apply(newSlots, isCustom) {
+    slots = newSlots; custom = isCustom;
+    $('skLine').textContent = PF.skeletonText(slots); $('skNote').hidden = !custom;
+    renderFields(); renderDraft();
+  }
+  function fromSelects() { apply(PF.fromControls(readControls()), false); }
+  function fromPaste(auto) {
+    var r = PF.parseSkeleton($('skin').value);
+    if (!$('skin').value.trim()) { $('skStatus').textContent = ''; return; }
+    if (!r.ok) { $('skStatus').textContent = '読み取れませんでした（' + r.reason + '）。選んで決めてください。'; return; }
+    var c = PF.toControls(r.slots);
+    if (c) { setControls(c); apply(PF.fromControls(c), false); } else apply(r.slots, true);
+    $('skStatus').textContent = '読み取れました。';
+  }
+  ['cOpen', 'cBody', 'cClose', 'cTag', 'cBlank'].forEach(function (id) { $(id).addEventListener('change', function () { $('skStatus').textContent = ''; fromSelects(); }); });
+  $('skin').addEventListener('input', function () { if (timer) clearTimeout(timer); timer = setTimeout(fromPaste, 200); });
+  $('skSample1').addEventListener('click', function () { $('skin').value = '数字＋予告で始める → 空行 → 本文3行 → 空行 → 問いで締める → タグ2個'; fromPaste(); });
+  $('skSample2').addEventListener('click', function () { $('skin').value = '共感で始める → 本文2行 → ひとことで締める → タグ1個'; fromPaste(); });
+  $('punctBtn').addEventListener('click', function () {
+    noPunct = !noPunct; this.setAttribute('aria-pressed', String(noPunct)); this.textContent = noPunct ? '句読点を戻す' : '句読点を外す'; renderDraft();
+  });
+  function fallback() { var s = $('draft'); if ($('result').hidden) return; s.focus(); s.select(); $('copyStatus').textContent = '選択しました。このまま長押しでコピーしてください。'; }
+  $('copyBtn').addEventListener('click', function () {
+    var t = $('draft').value; if (!t) { $('copyStatus').textContent = '先に欄へ文を入れてください。'; return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { $('copyStatus').textContent = '下書きをコピーしました。'; }, fallback);
+    else fallback();
+  });
+  setControls({ open: '数字', body: 3, blank: true, close: '問いかけ', tag: 2 });
+  fromSelects();
+})();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon='{"token": "b4c9f7e78daf4edb84ef52b88633f649"}'></script>
+</body>
+</html>
