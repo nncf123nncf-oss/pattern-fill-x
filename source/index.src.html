@@ -357,7 +357,7 @@ var PF = (function () {
       r = judgeOne('open', slot.type, t, slot.type2);
       if (slot.sameClose) {
         var r2 = judgeOne('close', slot.sameClose, t);
-        if (RANK[r2.state] > RANK[r.state]) r = { state: r2.state, msg: '（締めとして）' + r2.msg };
+        if (RANK[r2.state] > RANK[r.state]) r = { state: r2.state, msg: r2.msg ? '（締めとして）' + r2.msg : '' };
         else if (r2.msg && RANK[r2.state] === RANK[r.state] && r.state !== 'free') r.msg = r.msg || '（締めとして）' + r2.msg;
       }
     } else if (slot.k === 'close') r = judgeOne('close', slot.type, t);
@@ -395,14 +395,14 @@ var PF = (function () {
   var HINT = {
     open: {
       '数字': '判定は、数字と単位（つ・個・選・分・円・日・人・件・倍・％など）の組み合わせを手がかりにしています。日付と年は数字に数えません',
-      '問いかけ': '判定は、行の終わりが「？」か「〜か」であることを手がかりにしています',
+      '問いかけ': '判定は、行の終わりが「？」か「〜ですか」「〜ますか」などであることを手がかりにしています',
       '共感': '判定は、「正直」「実は」「本音」「しんどい」「悩んで」など気持ちを表す語を手がかりにしています',
       '体験': '判定は、「した」「でした」「ました」などの終わり方、または「昨日」「先月」などと「私」「自分」の組み合わせを手がかりにしています',
       '予告': '判定は、「まとめ」「方法」「コツ」「理由」「ポイント」「手順」「〜選」「つのこと」を手がかりにしています',
       '指定なし': '型の指定はありません。好きな1行を入れます'
     },
     close: {
-      '問いかけ': '判定は、行の終わりが「？」か「〜か」であることを手がかりにしています',
+      '問いかけ': '判定は、行の終わりが「？」か「〜ですか」「〜ますか」などであることを手がかりにしています',
       '呼びかけ': '判定は、「してみて」「ください」「どうぞ」「しましょう」などを手がかりにしています',
       'ひとこと': '判定は、20字以内で問いではない一言であることを手がかりにしています',
       'リンク誘導': '判定は、URLがあること、または「こちら」「↓」「👇」で終わることを手がかりにしています',
@@ -417,7 +417,7 @@ var PF = (function () {
     return 'リンク';
   }
   function fieldHint(s) {
-    if (s.k === 'open') return HINT.open[s.type] + (s.type2 ? '。または、' + HINT.open[s.type2] : '') + (s.sameClose ? '。この行は、締めの型の目安でも見ます' : '');
+    if (s.k === 'open') return HINT.open[s.type] + (s.type2 ? '。または、' + HINT.open[s.type2].replace(/^判定は、/, '') : '') + (s.sameClose ? '。この行は、締めの型の目安でも見ます' : '');
     if (s.k === 'close') return HINT.close[s.type];
     if (s.k === 'tag') return '「#」で始まる語を、半角スペースで区切って入れます';
     if (s.k === 'link') return 'URLを入れます';

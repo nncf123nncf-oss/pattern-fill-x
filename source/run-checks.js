@@ -77,7 +77,9 @@ eq(st({ k: 'link', id: 'l0' }, 'https://x.example/a'), 'ok', '判定 リンクok
 eq(st({ k: 'body', n: 1, id: 'b0' }, 'なにか'), 'free', '判定 本文は指定なし');
 eq(X.judge(OPEN('数字'), 'こんにちは').label, '決められない', '判定 ラベル文字'); eq(X.judge(OPEN('数字'), '3つ').label, '合っていそう', '判定 ラベル文字ok'); eq(X.judge(OPEN('数字'), '今日は休みました').label, '外れていそう', '判定 ラベル文字ng');
 const sc = { k: 'open', type: '問いかけ', sameClose: '問いかけ', id: 'open' };
-eq(st(sc, 'どうですか？'), 'ok', '判定 同じ行で締め ok'); eq(st({ k: 'open', type: '数字', sameClose: '問いかけ', id: 'open' }, '3つの話'), 'ng', '判定 同じ行で締め ng');
+eq(st(sc, 'どうですか？'), 'ok', '判定 同じ行で締め ok');
+eq(X.judge({ k: 'open', type: '指定なし', sameClose: '問いかけ', id: 'open' }, 'どうすればいいですか？').msg, '', '判定 型の指定なし+同じ行で締めok のとき余計な文言を出さない');
+eq(X.fieldHint({ k: 'open', type: '数字', type2: '予告' }).split('判定は').length - 1, 1, 'ヒント 2型で「判定は」が1回'); eq(st({ k: 'open', type: '数字', sameClose: '問いかけ', id: 'open' }, '3つの話'), 'ng', '判定 同じ行で締め ng');
 
 // S4 下書きの組み立て
 const sl = X.fromControls({ open: '数字', body: 2, blank: true, close: '問いかけ', tag: 2 });
